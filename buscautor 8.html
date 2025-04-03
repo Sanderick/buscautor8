@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscautor</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400&family=Catamaran:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #000000;
+            --bg-light: #d3d3d3;
+            --text-dark: #f4f4f4;
+            --text-light: #000000;
+            --highlight-dark: #b8860b;
+            --highlight-light: #4169e1;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+            background-color: var(--bg-dark);
+            color: var(--text-dark);
+        }
+        .light-mode {
+            background-color: var(--bg-light);
+            color: var(--text-light);
+        }
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 70px;
+            color: var(--highlight-dark);
+        }
+        .light-mode h1 {
+            color: #333;
+        }
+        p {
+            font-family: 'Catamaran', sans-serif;
+            font-size: 15px;
+        }
+        .light-mode p {
+            color: var(--text-light);
+        }
+        input {
+            width: 60%;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px;
+            background: black;
+            color: var(--highlight-dark);
+            border: none;
+            cursor: pointer;
+        }
+        .light-mode button {
+            background: #d3d3d3;
+            color: #333;
+        }
+        #resultado {
+            text-align: left;
+            max-width: 600px;
+            margin: auto;
+            line-height: 2;
+        }
+        a {
+            color: var(--highlight-dark);
+        }
+        .light-mode a {
+            color: var(--highlight-light);
+        }
+    </style>
+</head>
+<body>
+    <button onclick="toggleMode()" class="mode-toggle">
+        <span class="material-icons">dark_mode</span>
+    </button>
+    
+    <h1>Buscautor</h1>
+    <p>Ingresa el nombre del autor para conocer sus obras o el nombre de la obra para conocer al autor.</p>
+    <input type="text" id="busqueda" placeholder="Escribe un autor o una obra...">
+    <button onclick="buscar()">
+        <span class="material-icons">search</span>
+    </button>
+    <div id="resultado"></div>
+    
+    <script>
+        function toggleMode() {
+            document.body.classList.toggle("light-mode");
+            const icon = document.querySelector(".mode-toggle .material-icons");
+            icon.textContent = document.body.classList.contains("light-mode") ? "dark_mode" : "light_mode";
+        }
+        
+        async function buscar() {
+            const query = document.getElementById("busqueda").value.trim();
+            if (!query) {
+                alert("Por favor, ingresa un término de búsqueda.");
+                return;
+            }
+            
+            document.getElementById("resultado").innerHTML = "<p>Buscando...</p>";
+            
+            try {
+                let response = await fetch(`https://openlibrary.org/search/authors.json?q=${encodeURIComponent(query)}`);
+                let data = await response.json();
+                
+                if (data.docs.length) {
+                    let autor = data.docs[0];
+                    let autorKey = autor.key;
+                    let obrasResponse = await fetch(`https://openlibrary.org/authors/${autorKey}/works.json`);
+                    let obrasData = await obrasResponse.json();
+                    let obras = obrasData.entries.map(obra => ({
+                        titulo: obra.title,
+                        ano: obra.first_publish_date ? obra.first_publish_date.match(/\d{4}/)?.[0] || "" : "",
+                        link: `https://www.google.com/search?q=${encodeURIComponent(obra.title + ' resumen')}`
+                    })).sort((a, b) => (a.ano || "9999") - (b.ano || "9999"));
+                    
+                    document.getElementById("resultado").innerHTML = `
+                        <h2>Obras de ${autor.name}</h2>
+                        <ul>${obras.map(obra => `<li>${obra.ano ? `<strong>${obra.ano}</strong> - ` : ""}${obra.titulo} - <a href="${obra.link}" target="_blank">Ver reseña</a></li>`).join("")}</ul>
+                    `;
+                    return;
+                }
+                
+                response = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(query)}`);
+                data = await response.json();
+                
+                if (data.docs.length) {
+                    let obra = data.docs[0];
+                    let autorNombre = obra.author_name ? obra.author_name[0] : "Desconocido";
+                    let autorLink = `https://www.google.com/search?q=${encodeURIComponent(autorNombre)}`;
+                    
+                    document.getElementById("resultado").innerHTML = `
+                        <h2>Autor de "${obra.title}"</h2>
+                        <p>${autorNombre} - <a href="${autorLink}" target="_blank">Más información</a></p>
+                    `;
+                    return;
+                }
+                
+                document.getElementById("resultado").innerHTML = `<p>No se encontraron resultados.</p>`;
+            } catch (error) {
+                document.getElementById("resultado").innerHTML = `<p>Error al buscar la información.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
